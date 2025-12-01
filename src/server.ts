@@ -1,49 +1,14 @@
 import express, { Request, Response } from "express";
-import { Pool } from "pg";
-import dotenv from "dotenv";
-dotenv.config();
+import config from "./config";
+import { initDB, pool } from "./config/db";
+
 
 const app = express();
-const port = 5000;
 
 // Middleware
 app.use(express.json());
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
 
-const initDB = async () => {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        email VARCHAR(100) NOT NULL UNIQUE,
-        age INT,
-        phone VARCHAR(15),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS todo (
-        id SERIAL PRIMARY KEY,
-        user_id INT REFERENCES users(id) ON DELETE CASCADE,
-        title VARCHAR(255) NOT NULL,
-        description TEXT,
-        is_completed BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    console.log("Tables are ready");
-  } catch (error) {
-    console.error("DB Initialization Error:", error);
-  }
-};
 
 initDB();
 
@@ -75,7 +40,7 @@ app.post("/users", async (req: Request, res: Response) => {
   }
 });
 
-// ➤ Get All Users
+//  Get All Users
 app.get("/users", async (req: Request, res: Response) => {
   try {
     const result = await pool.query("SELECT * FROM users");
@@ -86,15 +51,12 @@ app.get("/users", async (req: Request, res: Response) => {
   }
 });
 
-// ➤ Get User by ID
+//  Get User by ID
 app.get("/users/:id", async (req: Request, res: Response) => {
   const { id } = req.params;
 
   try {
-    const result = await pool.query(
-      `SELECT * FROM users WHERE id = $1`,
-      [id]
-    );
+    const result = await pool.query(`SELECT * FROM users WHERE id = $1`, [id]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({
@@ -113,7 +75,76 @@ app.get("/users/:id", async (req: Request, res: Response) => {
   }
 });
 
+// Delete User by ID
+app.delete("/user-delete/:id", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `DELETE FROM users WHERE id = $1 RETURNING *`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "User deleted successfully",
+      user: result.rows[0],
+    });
+  } catch (err) {
+    console.error("Error deleting user:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Error deleting user",
+    });
+  }
+});
+
+// update User by ID
+app.put("/user-update/:id", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { name, email, age, phone } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE users SET name=$1, email=$2, age=$3, phone=$4, updated_at=CURRENT_TIMESTAMP WHERE id=$5 RETURNING *`,
+      [name, email, age, phone, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "User updated successfully",
+      user: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Error updating user:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error updating user",
+    });
+  }
+});
+
+app.use((req,res)=>{
+
+  res.status(404).send({
+    success:false,
+    message:"Route not found"
+  })
+
+})
+
 // Start Server
-app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
+app.listen(config.port, () => {
+  console.log(`Example app listening on port ${config.port}`);
 });
