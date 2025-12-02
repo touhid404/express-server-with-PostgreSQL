@@ -3,10 +3,9 @@ import { pool } from "../../config/db";
 import { createUserInDB } from "./user.service";
 
 export const createUser = async (req: Request, res: Response) => {
-  const { name, email, age, phone } = req.body;
-
+  
   try {
-    const result = await createUserInDB(name, email, age, phone);
+    const result = await createUserInDB(req.body);
     res.status(201).json({ success: true, user: result.rows[0] });
   } catch (error) {
     console.error("Error inserting user:", error);

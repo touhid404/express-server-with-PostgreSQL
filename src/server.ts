@@ -3,6 +3,7 @@ import config from "./config";
 import { initDB, pool } from "./config/db";
 import logger from "./middleware/logger";
 import { usersRoutes } from "./modules/user/user.routes";
+import { authRoutes } from "./modules/auth/auth.routes";
 
 
 const app = express();
@@ -26,6 +27,7 @@ app.get("/", logger, (req: Request, res: Response) => {
 
 // User CRUD Routes
 app.use('/users',usersRoutes);
+app.use('/auth',authRoutes);
 app.use((req,res)=>{
 
   res.status(404).send({
